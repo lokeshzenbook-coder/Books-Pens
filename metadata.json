@@ -1,0 +1,6 @@
+{
+  "name": "Books & Pens E-Commerce",
+  "description": "A polished, responsive e-commerce website for selling books and pens with full product catalog, advanced filtering, shopping cart, user profiles, wishlist, and an administrative dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
