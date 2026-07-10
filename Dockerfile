@@ -1,40 +1,30 @@
 # -----------------------------
-# Builder Stage
+# Builder stage
 # -----------------------------
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package manifest
-COPY package.json ./
+# Copy package files and install all dependencies
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
-
-# Copy application source
+# Copy application source and build
 COPY . .
-
-# Build the application (remove this line if your project doesn't have a build script)
 RUN npm run build
 
 # -----------------------------
-# Runtime Stage
+# Runtime stage
 # -----------------------------
-FROM node:22-alpine
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-ENV NODE_ENV=production
-
-# Copy package manifest
+# Copy the production build and installed node_modules from the builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 COPY package.json ./
-
-# Install only production dependencies
-RUN npm install --omit=dev
-
-# Copy application from builder
-COPY --from=builder /app .
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
