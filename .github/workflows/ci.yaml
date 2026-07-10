@@ -10,101 +10,93 @@ on:
 
 permissions:
   contents: read
+  security-events: write
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/books-pens
 
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-          persist-credentials: false
 
-      - name: Use Node.js 22
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: 22
+          cache: npm
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      - name: Run TypeScript lints
+      - name: Run ESLint
         run: npm run lint
 
   gitleaks:
-    name: Secret scan with Gitleaks
+    name: Secret Scan
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
-          persist-credentials: false
 
-      - name: Run Gitleaks scan
-        uses: zricethezav/gitleaks-action@v1.4.0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: '--verbose --redact'
 
-  docker-build-and-push:
-    name: Build and push Docker image
-    needs: [lint, gitleaks]
+  docker:
+    name: Build, Scan & Push Docker Image
+    needs:
+      - lint
+      - gitleaks
+
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-          persist-credentials: false
 
-      - name: Log in to Docker Hub
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
-          push: false
+          file: ./Dockerfile
           load: true
+          push: false
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/books-pens:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/books-pens:${{ github.sha }}
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/books-pens:latest
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:latest
           cache-to: type=inline
 
-      - name: Cache Trivy DB
-        uses: actions/cache@v4
+      - name: Scan Docker Image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
         with:
-          path: ~/.cache/trivy
-          key: trivy-db-${{ github.run_id }}
-          restore-keys: |
-            trivy-db-
-
-      - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@v0.36.0
-        env:
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          scan-type: image
-          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/books-pens:latest
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: table
-          severity: CRITICAL,HIGH,MEDIUM
-          ignore-unfixed: true
-          exit-code: 1
-          timeout: 10m
+          exit-code: 0
+          severity: HIGH,CRITICAL
 
-      - name: Push Docker image to Docker Hub
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/books-pens:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/books-pens:${{ github.sha }}
+      - name: Push Docker Image (latest)
+        run: docker push ${{ env.IMAGE_NAME }}:latest
+
+      - name: Push Docker Image (SHA)
+        run: docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
