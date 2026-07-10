@@ -82,7 +82,7 @@ jobs:
           cache-to: type=inline
 
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@v2
+        uses: aquasecurity/trivy-action@v1
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/books-pens:latest
           format: table
