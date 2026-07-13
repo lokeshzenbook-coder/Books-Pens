@@ -17,7 +17,7 @@ env:
 
 jobs:
   lint:
-    name: Lint
+    name: Lints
     runs-on: ubuntu-latest
 
     steps:
