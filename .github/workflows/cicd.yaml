@@ -37,7 +37,7 @@ on:
           - deploy
 
 env:
-  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  
   ECR_REPOSITORY_NAME: books-pens
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/books-pens
   EKS_CLUSTER_NAME: books-cluster
